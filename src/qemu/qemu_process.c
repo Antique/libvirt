@@ -5405,7 +5405,7 @@ qemuProcessStart(virConnectPtr conn,
 
     if ((rv = qemuProcessLaunch(conn, driver, vm, asyncJob, incoming,
                                 snapshot, vmop, flags)) < 0) {
-        if (rv == -1)
+        if (rv == -2)
             relabel = true;
         goto stop;
     }
