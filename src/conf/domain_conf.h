@@ -2818,9 +2818,9 @@ int virDomainGraphicsListenSetType(virDomainGraphicsDefPtr def, size_t i, int va
 const char *virDomainGraphicsListenGetAddress(virDomainGraphicsDefPtr def,
                                               size_t i)
             ATTRIBUTE_NONNULL(1);
-int virDomainGraphicsListenSetAddress(virDomainGraphicsDefPtr def,
-                                      size_t i, const char *address,
-                                      int len, bool setType)
+int virDomainGraphicsListenAddAddress(virDomainGraphicsDefPtr def,
+                                      int pos,
+                                      const char *address)
             ATTRIBUTE_NONNULL(1);
 const char *virDomainGraphicsListenGetNetwork(virDomainGraphicsDefPtr def,
                                               size_t i)
