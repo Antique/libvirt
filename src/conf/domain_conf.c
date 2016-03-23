@@ -10606,7 +10606,7 @@ virDomainGraphicsAuthDefParseXML(xmlNodePtr node,
 }
 
 static int
-virDomainGraphicsListenDefParseXML(virDomainGraphicsListenDefPtr def,
+virDomainGraphicsListenDefParseXML(virDomainGraphicsDefPtr def,
                                    xmlNodePtr node,
                                    unsigned int flags)
 {
@@ -10616,6 +10616,9 @@ virDomainGraphicsListenDefParseXML(virDomainGraphicsListenDefPtr def,
     char *network  = virXMLPropString(node, "network");
     char *fromConfig = virXMLPropString(node, "fromConfig");
     int tmp;
+    virDomainGraphicsListenDef listen;
+
+    memset(&listen, 0, sizeof(listen));
 
     if (!type) {
         virReportError(VIR_ERR_XML_ERROR, "%s",
@@ -10623,7 +10626,7 @@ virDomainGraphicsListenDefParseXML(virDomainGraphicsListenDefPtr def,
         goto error;
     }
 
-    if ((def->type = virDomainGraphicsListenTypeFromString(type)) < 0) {
+    if ((listen.type = virDomainGraphicsListenTypeFromString(type)) < 0) {
         virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
                        _("unknown graphics listen type '%s'"), type);
         goto error;
@@ -10633,22 +10636,22 @@ virDomainGraphicsListenDefParseXML(virDomainGraphicsListenDefPtr def,
      * type='network' and we're looking at live XML (i.e. *not*
      * inactive). It is otherwise ignored. */
     if (address && address[0] &&
-        (def->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS ||
-         (def->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK &&
+        (listen.type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS ||
+         (listen.type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK &&
           !(flags & VIR_DOMAIN_DEF_PARSE_INACTIVE)))) {
-        def->address = address;
+        listen.address = address;
         address = NULL;
     }
 
     if (network && network[0]) {
-        if (def->type != VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK) {
+        if (listen.type != VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK) {
             /* network='xxx' never makes sense with anything except
              * type='network' */
             virReportError(VIR_ERR_XML_ERROR, "%s",
                            _("network attribute not allowed when listen type is not network"));
             goto error;
         }
-        def->network = network;
+        listen.network = network;
         network = NULL;
     }
 
@@ -10660,13 +10663,16 @@ virDomainGraphicsListenDefParseXML(virDomainGraphicsListenDefPtr def,
                            fromConfig);
             goto error;
         }
-        def->fromConfig = tmp != 0;
+        listen.fromConfig = tmp != 0;
     }
+
+    if (VIR_APPEND_ELEMENT_COPY_INPLACE(def->listens, def->nListens, listen) < 0)
+        goto error;
 
     ret = 0;
  error:
     if (ret < 0)
-        virDomainGraphicsListenDefClear(def);
+        virDomainGraphicsListenDefClear(&listen);
     VIR_FREE(type);
     VIR_FREE(address);
     VIR_FREE(network);
@@ -10709,7 +10715,7 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
             goto error;
 
         for (i = 0; i < nListens; i++) {
-            if (virDomainGraphicsListenDefParseXML(&def->listens[i],
+            if (virDomainGraphicsListenDefParseXML(def,
                                                    listenNodes[i],
                                                    flags) < 0)
                 goto error;
@@ -10718,7 +10724,6 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
                 def->listens[i].type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS)
                 address = &def->listens[i];
 
-            def->nListens++;
         }
         VIR_FREE(listenNodes);
     }
