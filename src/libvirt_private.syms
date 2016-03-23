@@ -305,7 +305,6 @@ virDomainGraphicsListenAddNetwork;
 virDomainGraphicsListenGetAddress;
 virDomainGraphicsListenGetNetwork;
 virDomainGraphicsListenGetType;
-virDomainGraphicsListenSetType;
 virDomainGraphicsSpiceChannelModeTypeFromString;
 virDomainGraphicsSpiceChannelModeTypeToString;
 virDomainGraphicsSpiceChannelNameTypeFromString;
