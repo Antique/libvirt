@@ -4282,26 +4282,6 @@ qemuProcessSetupGraphics(virQEMUDriverPtr driver,
             if (qemuProcessSPICEAllocatePorts(driver, cfg, graphics, true) < 0)
                 goto cleanup;
         }
-
-        if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC ||
-            graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_SPICE) {
-            if (graphics->nListens == 0) {
-                const char *listenAddr
-                    = graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC ?
-                    cfg->vncListen : cfg->spiceListen;
-
-                if (virDomainGraphicsListenAddAddress(graphics, 0,
-                                                      listenAddr) < 0)
-                    goto cleanup;
-
-                graphics->listens[0].fromConfig = true;
-            } else if (graphics->nListens > 1) {
-                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                               _("QEMU does not support multiple listen "
-                                 "addresses for one graphics device."));
-                goto cleanup;
-            }
-        }
     }
 
     ret = 0;
@@ -4528,6 +4508,19 @@ qemuProcessStartValidate(virQEMUDriverPtr driver,
         if (!shmem) {
             VIR_WARN("Detected vhost-user interface without any shared memory, "
                      "the interface might not be operational");
+        }
+    }
+
+    for (i = 0; i < vm->def->ngraphics; i++) {
+        virDomainGraphicsDefPtr graphics = vm->def->graphics[i];
+        if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC ||
+            graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_SPICE) {
+            if (graphics->nListens > 1) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("QEMU does not support multiple listen "
+                                 "addresses for one graphics device."));
+                return -1;
+            }
         }
     }
 
@@ -5014,6 +5007,21 @@ qemuProcessPrepareDomain(virConnectPtr conn,
                     goto cleanup;
 
                 continue;
+            }
+        }
+
+        if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC ||
+            graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_SPICE) {
+            if (graphics->nListens == 0) {
+                const char *listenAddr
+                    = graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC ?
+                    cfg->vncListen : cfg->spiceListen;
+
+                if (virDomainGraphicsListenAddAddress(graphics, 0,
+                                                      listenAddr) < 0)
+                    goto cleanup;
+
+                graphics->listens[0].fromConfig = true;
             }
         }
     }
