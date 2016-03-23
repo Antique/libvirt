@@ -4962,6 +4962,7 @@ qemuProcessPrepareDomain(virConnectPtr conn,
     size_t i;
     char *nodeset = NULL;
     qemuDomainObjPrivatePtr priv = vm->privateData;
+    virQEMUDriverConfigPtr cfg = virQEMUDriverGetConfig(driver);
     virCapsPtr caps;
 
     if (!(caps = virQEMUDriverGetCapabilities(driver, false)))
@@ -5001,6 +5002,22 @@ qemuProcessPrepareDomain(virConnectPtr conn,
     if (qemuAssignDeviceAliases(vm->def, priv->qemuCaps) < 0)
         goto cleanup;
 
+    /* Generate socket paths for graphics */
+    for (i = 0; i < vm->def->ngraphics; i++) {
+        virDomainGraphicsDefPtr graphics = vm->def->graphics[i];
+
+        switch (graphics->type) {
+        case VIR_DOMAIN_GRAPHICS_TYPE_VNC:
+            if (cfg->vncAutoUnixSocket && !graphics->data.vnc.socket) {
+                if (virAsprintf(&graphics->data.vnc.socket,
+                                "%s/vnc.sock", priv->libDir) < 0)
+                    goto cleanup;
+
+                continue;
+            }
+        }
+    }
+
     /* "volume" type disk's source must be translated before
      * cgroup and security setting.
      */
@@ -5038,6 +5055,7 @@ qemuProcessPrepareDomain(virConnectPtr conn,
  cleanup:
     VIR_FREE(nodeset);
     virObjectUnref(caps);
+    virObjectUnref(cfg);
     return ret;
 }
 
@@ -5235,7 +5253,6 @@ qemuProcessLaunch(virConnectPtr conn,
                                      qemuCheckFips(),
                                      priv->autoNodeset,
                                      &nnicindexes, &nicindexes,
-                                     priv->libDir,
                                      priv->channelTargetDir)))
         goto cleanup;
 
@@ -5657,7 +5674,6 @@ qemuProcessCreatePretendCmd(virConnectPtr conn,
                                priv->autoNodeset,
                                NULL,
                                NULL,
-                               priv->libDir,
                                priv->channelTargetDir);
 
  cleanup:

@@ -903,6 +903,10 @@ mymain(void)
     VIR_FREE(driver.config->vncSASLdir);
     VIR_FREE(driver.config->vncTLSx509certdir);
 
+    driver.config->vncAutoUnixSocket = true;
+    DO_TEST("graphics-vnc-auto-unix-socket", QEMU_CAPS_VNC);
+    driver.config->vncAutoUnixSocket = false;
+
     DO_TEST("graphics-sdl", QEMU_CAPS_SDL);
     DO_TEST("graphics-sdl-fullscreen", QEMU_CAPS_SDL);
     DO_TEST("nographics", NONE);
