@@ -2811,6 +2811,8 @@ virDomainHostdevRemove(virDomainDefPtr def, size_t i);
 int virDomainHostdevFind(virDomainDefPtr def, virDomainHostdevDefPtr match,
                          virDomainHostdevDefPtr *found);
 
+virDomainGraphicsListenDefPtr
+virDomainGraphicsGetListen(virDomainGraphicsDefPtr def, size_t i);
 int virDomainGraphicsListenGetType(virDomainGraphicsDefPtr def, size_t i)
             ATTRIBUTE_NONNULL(1);
 const char *virDomainGraphicsListenGetAddress(virDomainGraphicsDefPtr def,
