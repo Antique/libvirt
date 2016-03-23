@@ -2825,8 +2825,9 @@ int virDomainGraphicsListenAddAddress(virDomainGraphicsDefPtr def,
 const char *virDomainGraphicsListenGetNetwork(virDomainGraphicsDefPtr def,
                                               size_t i)
             ATTRIBUTE_NONNULL(1);
-int virDomainGraphicsListenSetNetwork(virDomainGraphicsDefPtr def,
-                                      size_t i, const char *network, int len)
+int virDomainGraphicsListenAddNetwork(virDomainGraphicsDefPtr def,
+                                      int pos,
+                                      const char *network)
             ATTRIBUTE_NONNULL(1);
 
 int virDomainNetGetActualType(virDomainNetDefPtr iface);
