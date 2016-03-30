@@ -7240,9 +7240,13 @@ qemuBuildGraphicsVNCCommandLine(virQEMUDriverConfigPtr cfg,
         goto error;
     }
 
-    if (listen->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET) {
+    switch (listen->type) {
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET:
         virBufferAsprintf(&opt, "unix:%s", listen->socket);
-    } else {
+        break;
+
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS:
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK:
         if (!graphics->data.vnc.autoport &&
             (graphics->data.vnc.port < 5900 ||
              graphics->data.vnc.port > 65535)) {
@@ -7290,17 +7294,22 @@ qemuBuildGraphicsVNCCommandLine(virQEMUDriverConfigPtr cfg,
                           graphics->data.vnc.port - 5900);
 
         VIR_FREE(netAddr);
-    }
 
-    if (listen->type != VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET &&
-        graphics->data.vnc.websocket) {
-        if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_VNC_WEBSOCKET)) {
-            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                           _("VNC WebSockets are not supported "
-                             "with this QEMU binary"));
-            goto error;
+        if (graphics->data.vnc.websocket) {
+            if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_VNC_WEBSOCKET)) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("VNC WebSockets are not supported "
+                                 "with this QEMU binary"));
+                goto error;
+            }
+            virBufferAsprintf(&opt, ",websocket=%d", graphics->data.vnc.websocket);
         }
-        virBufferAsprintf(&opt, ",websocket=%d", graphics->data.vnc.websocket);
+        break;
+
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NONE:
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_FD:
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_LAST:
+        break;
     }
 
     if (graphics->data.vnc.sharePolicy) {
@@ -7387,9 +7396,13 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
         goto error;
     }
 
-    if (listen->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET) {
+    switch (listen->type) {
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET:
         virBufferAsprintf(&opt, "unix,addr=%s,", listen->socket);
-    } else {
+        break;
+
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS:
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK:
         if (port > 0)
             virBufferAsprintf(&opt, "port=%u,", port);
 
@@ -7438,6 +7451,12 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
 
             VIR_FREE(netAddr);
         }
+        break;
+
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NONE:
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_FD:
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_LAST:
+        break;
     }
 
     if (cfg->spiceSASL) {
