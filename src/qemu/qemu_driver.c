@@ -7065,8 +7065,11 @@ static char *qemuConnectDomainXMLToNative(virConnectPtr conn,
     /* do fake auto-alloc of graphics ports, if such config is used */
     for (i = 0; i < vm->def->ngraphics; ++i) {
         virDomainGraphicsDefPtr graphics = vm->def->graphics[i];
+        virDomainGraphicsListenDefPtr listen
+            = virDomainGraphicsGetListen(graphics, 0);
         if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC &&
-            !graphics->data.vnc.socket && graphics->data.vnc.autoport) {
+            (!listen || !listen->socket) &&
+            graphics->data.vnc.autoport) {
             graphics->data.vnc.port = 5900;
         } else if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_SPICE) {
             if (qemuProcessSPICEAllocatePorts(driver, cfg, graphics, false) < 0)

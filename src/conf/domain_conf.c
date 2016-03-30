@@ -1249,7 +1249,6 @@ void virDomainGraphicsDefFree(virDomainGraphicsDefPtr def)
 
     switch ((virDomainGraphicsType)def->type) {
     case VIR_DOMAIN_GRAPHICS_TYPE_VNC:
-        VIR_FREE(def->data.vnc.socket);
         VIR_FREE(def->data.vnc.keymap);
         virDomainGraphicsAuthDefClear(&def->data.vnc.auth);
         break;
@@ -10712,7 +10711,9 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
     xmlNodePtr *listenNodes = NULL;
     xmlNodePtr save = ctxt->node;
     virDomainGraphicsListenDefPtr address = NULL;
+    virDomainGraphicsListenDefPtr socket = NULL;
     char *listenAddr = NULL;
+    char *socketPath = NULL;
     int nListens;
     int ret = -1;
 
@@ -10738,6 +10739,9 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
             if (!address &&
                 def->listens[i].type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS)
                 address = &def->listens[i];
+            if (!socket &&
+                def->listens[i].type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET)
+                socket = &def->listens[i];
 
         }
         VIR_FREE(listenNodes);
@@ -10758,16 +10762,42 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
         goto error;
     }
 
+    socketPath = virXMLPropString(node, "socket");
+    if (socketPath && !socketPath[0])
+        VIR_FREE(socketPath);
+
+    if ((socketPath || socket) &&
+        def->type != VIR_DOMAIN_GRAPHICS_TYPE_VNC) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("socket is not available for graphics type='%s'"),
+                       virDomainGraphicsTypeToString(def->type));
+        goto error;
+    }
+
+    if (STREQ_NULLABLE(socket->socket, socketPath) < 0) {
+        virReportError(VIR_ERR_XML_ERROR,
+                       _("graphics socket attribute '%s' must match socket "
+                         "attribute of first socket listen element "
+                         "(found '%s')"),
+                       listenAddr, address->address);
+        goto error;
+    }
+
     /* There were no <listen> elements, so we can just
      * directly set listenAddr as listens[0]->address */
     if (listenAddr && def->nListens == 0 &&
         virDomainGraphicsListenAddAddress(def, 0, listenAddr) < 0)
         goto error;
 
+    if (socketPath && def->nListens == 0 &&
+        virDomainGraphicsListenAddSocket(def, 0, socketPath) < 0)
+        goto error;
+
     ret = 0;
  error:
     VIR_FREE(listenNodes);
     VIR_FREE(listenAddr);
+    VIR_FREE(socketPath);
     ctxt->node = save;
     return ret;
 }
@@ -10837,7 +10867,6 @@ virDomainGraphicsDefParseXMLVnc(virDomainGraphicsDefPtr def,
         }
     }
 
-    def->data.vnc.socket = virXMLPropString(node, "socket");
     def->data.vnc.keymap = virXMLPropString(node, "keymap");
 
     if (virDomainGraphicsAuthDefParseXML(node, &def->data.vnc.auth,
@@ -21353,6 +21382,7 @@ virDomainGraphicsDefFormat(virBufferPtr buf,
 {
     const char *type = virDomainGraphicsTypeToString(def->type);
     const char *listenAddr = NULL;
+    const char *socketPath = NULL;
     bool children = false;
     size_t i;
 
@@ -21376,7 +21406,13 @@ virDomainGraphicsDefFormat(virBufferPtr buf,
                      VIR_DOMAIN_DEF_FORMAT_MIGRATABLE))
             continue;
 
-        if ((listenAddr = def->listens[i].address))
+        if (!listenAddr)
+            listenAddr = def->listens[i].address;
+
+        if (!socketPath)
+            socketPath = def->listens[i].socket;
+
+        if (listenAddr && socketPath)
             break;
     }
 
@@ -21384,8 +21420,8 @@ virDomainGraphicsDefFormat(virBufferPtr buf,
 
     switch (def->type) {
     case VIR_DOMAIN_GRAPHICS_TYPE_VNC:
-        if (def->data.vnc.socket) {
-            virBufferEscapeString(buf, " socket='%s'", def->data.vnc.socket);
+        if (socketPath) {
+            virBufferEscapeString(buf, " socket='%s'", socketPath);
         } else {
             if (def->data.vnc.port &&
                 (!def->data.vnc.autoport || !(flags & VIR_DOMAIN_DEF_FORMAT_INACTIVE)))

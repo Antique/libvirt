@@ -3757,8 +3757,9 @@ qemuProcessVNCAllocatePorts(virQEMUDriverPtr driver,
                             virDomainGraphicsDefPtr graphics)
 {
     unsigned short port;
+    virDomainGraphicsListenDefPtr listen = virDomainGraphicsGetListen(graphics, 0);
 
-    if (graphics->data.vnc.socket)
+    if (listen && listen->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET)
         return 0;
 
     if (graphics->data.vnc.autoport) {
@@ -4998,13 +4999,26 @@ qemuProcessPrepareDomain(virConnectPtr conn,
     /* Generate socket paths for graphics */
     for (i = 0; i < vm->def->ngraphics; i++) {
         virDomainGraphicsDefPtr graphics = vm->def->graphics[i];
+        virDomainGraphicsListenDefPtr listen
+            = virDomainGraphicsGetListen(graphics, 0);
 
         switch (graphics->type) {
         case VIR_DOMAIN_GRAPHICS_TYPE_VNC:
-            if (cfg->vncAutoUnixSocket && !graphics->data.vnc.socket) {
-                if (virAsprintf(&graphics->data.vnc.socket,
-                                "%s/vnc.sock", priv->libDir) < 0)
+            if (cfg->vncAutoUnixSocket) {
+                if (listen &&
+                    listen->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET)
+                    continue;
+
+                char *socketPath;
+                if (virAsprintf(&socketPath, "%s/vnc.sock", priv->libDir) < 0)
                     goto cleanup;
+
+                if (virDomainGraphicsListenAddSocket(graphics, 0,
+                                                     socketPath) < 0) {
+                    VIR_FREE(socketPath);
+                    goto cleanup;
+                }
+                VIR_FREE(socketPath);
 
                 continue;
             }

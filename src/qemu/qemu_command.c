@@ -7234,8 +7234,14 @@ qemuBuildGraphicsVNCCommandLine(virQEMUDriverConfigPtr cfg,
         goto error;
     }
 
-    if (graphics->data.vnc.socket) {
-        virBufferAsprintf(&opt, "unix:%s", graphics->data.vnc.socket);
+    if (!(listen = virDomainGraphicsGetListen(graphics, 0))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("missing listen element for graphics device"));
+        goto error;
+    }
+
+    if (listen->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET) {
+        virBufferAsprintf(&opt, "unix:%s", listen->socket);
     } else {
         if (!graphics->data.vnc.autoport &&
             (graphics->data.vnc.port < 5900 ||
@@ -7245,34 +7251,31 @@ qemuBuildGraphicsVNCCommandLine(virQEMUDriverConfigPtr cfg,
             goto error;
         }
 
-        if ((listen = virDomainGraphicsGetListen(graphics, 0))) {
+        switch (listen->type) {
+        case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS:
+            listenAddr = listen->address;
+            break;
 
-            switch (listen->type) {
-            case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS:
-                listenAddr = listen->address;
+        case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK:
+            if (!listen->network)
                 break;
 
-            case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK:
-                if (!listen->network)
-                    break;
-
-                ret = networkGetNetworkAddress(listen->network, &netAddr);
-                if (ret <= -2) {
-                    virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
-                                   "%s", _("network-based listen not possible, "
-                                           "network driver not present"));
-                    goto error;
-                }
-                if (ret < 0)
-                    goto error;
-
-                listenAddr = netAddr;
-                /* store the address we found in the <graphics> element so it
-                 * will show up in status. */
-                if (VIR_STRDUP(listen->address, netAddr) < 0)
-                    goto error;
-                break;
+            ret = networkGetNetworkAddress(listen->network, &netAddr);
+            if (ret <= -2) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED,
+                               "%s", _("network-based listen not possible, "
+                                       "network driver not present"));
+                goto error;
             }
+            if (ret < 0)
+                goto error;
+
+            listenAddr = netAddr;
+            /* store the address we found in the <graphics> element so it
+             * will show up in status. */
+            if (VIR_STRDUP(listen->address, netAddr) < 0)
+                goto error;
+            break;
         }
 
         if (!listenAddr)
@@ -7289,7 +7292,7 @@ qemuBuildGraphicsVNCCommandLine(virQEMUDriverConfigPtr cfg,
         VIR_FREE(netAddr);
     }
 
-    if (!graphics->data.vnc.socket &&
+    if (listen->type != VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET &&
         graphics->data.vnc.websocket) {
         if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_VNC_WEBSOCKET)) {
             virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",

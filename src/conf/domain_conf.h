@@ -1555,7 +1555,6 @@ struct _virDomainGraphicsDef {
             int websocket;
             bool autoport;
             char *keymap;
-            char *socket;
             virDomainGraphicsAuthDef auth;
             int sharePolicy;
         } vnc;
