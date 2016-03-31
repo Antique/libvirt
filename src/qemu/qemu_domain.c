@@ -1402,6 +1402,7 @@ qemuDomainDefPostParse(virDomainDefPtr def,
     virQEMUDriverPtr driver = opaque;
     virQEMUDriverConfigPtr cfg = virQEMUDriverGetConfig(driver);
     virQEMUCapsPtr qemuCaps = NULL;
+    size_t i;
     int ret = -1;
 
     if (def->os.bootloader || def->os.bootloaderArgs) {
@@ -1429,6 +1430,15 @@ qemuDomainDefPostParse(virDomainDefPtr def,
     if (!def->emulator &&
         !(def->emulator = virDomainDefGetDefaultEmulator(def, caps)))
         return ret;
+
+    for (i = 0; i < def->ngraphics; i++) {
+        virDomainGraphicsDefPtr graphics = def->graphics[i];
+
+        if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC) {
+            if (cfg->vncAutoUnixSocket)
+                virDomainGraphicsListenClear(graphics);
+        }
+    }
 
     if (!(qemuCaps = virQEMUCapsCacheLookup(driver->qemuCapsCache,
                                             def->emulator)))
