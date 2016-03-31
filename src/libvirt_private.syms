@@ -302,6 +302,7 @@ virDomainGraphicsAuthConnectedTypeToString;
 virDomainGraphicsDefFree;
 virDomainGraphicsGetListen;
 virDomainGraphicsListenAddAddress;
+virDomainGraphicsListenAddFd;
 virDomainGraphicsListenAddNetwork;
 virDomainGraphicsListenAddSocket;
 virDomainGraphicsListenClear;

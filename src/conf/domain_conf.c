@@ -557,7 +557,8 @@ VIR_ENUM_IMPL(virDomainGraphicsListen, VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_LAST,
               "none",
               "address",
               "network",
-              "socket")
+              "socket",
+              "fd")
 
 VIR_ENUM_IMPL(virDomainGraphicsAuthConnected,
               VIR_DOMAIN_GRAPHICS_AUTH_CONNECTED_LAST,
@@ -10712,6 +10713,7 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
     xmlNodePtr save = ctxt->node;
     virDomainGraphicsListenDefPtr address = NULL;
     virDomainGraphicsListenDefPtr socket = NULL;
+    virDomainGraphicsListenDefPtr fd = NULL;
     char *listenAddr = NULL;
     char *socketPath = NULL;
     int nListens;
@@ -10742,9 +10744,19 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
             if (!socket &&
                 def->listens[i].type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET)
                 socket = &def->listens[i];
+            if (!fd &&
+                def->listens[i].type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_FD)
+                fd = &def->listens[i];
 
         }
         VIR_FREE(listenNodes);
+    }
+
+    if (fd && def->nListens > 1) {
+        virReportError(VIR_ERR_XML_ERROR, "%s",
+                       _("graphics listen type='fd' cannot be combined with "
+                         "any other listen type"));
+        goto error;
     }
 
     /* listen attribute of <graphics> is also supported by these,
@@ -23891,6 +23903,23 @@ virDomainGraphicsListenAddSocket(virDomainGraphicsDefPtr def,
  error:
     VIR_FREE(listen.socket);
     return -1;
+}
+
+
+int
+virDomainGraphicsListenAddFd(virDomainGraphicsDefPtr def,
+                             int pos)
+{
+    virDomainGraphicsListenDef listen;
+
+    memset(&listen, 0, sizeof(listen));
+
+    listen.type = VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_FD;
+
+    if (VIR_INSERT_ELEMENT_COPY(def->listens, pos, def->nListens, listen) < 0)
+        return -1;
+
+    return 0;
 }
 
 
