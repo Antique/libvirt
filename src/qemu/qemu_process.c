@@ -5022,6 +5022,19 @@ qemuProcessPrepareDomain(virConnectPtr conn,
 
                 continue;
             }
+        case VIR_DOMAIN_GRAPHICS_TYPE_SPICE:
+            if (cfg->spiceAutoUnixSocket && !listen) {
+                char *socketPath = NULL;
+
+                if (virAsprintf(&socketPath, "%s/spice.sock", priv->libDir) < 0)
+                    goto cleanup;
+
+                if (virDomainGraphicsListenAddSocket(graphics, 0, socketPath) < 0) {
+                    VIR_FREE(socketPath);
+                    goto cleanup;
+                }
+                VIR_FREE(socketPath);
+            }
         }
 
         if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC ||

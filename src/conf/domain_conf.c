@@ -10767,7 +10767,8 @@ virDomainGraphicsListensParseXML(virDomainGraphicsDefPtr def,
         VIR_FREE(socketPath);
 
     if ((socketPath || socket) &&
-        def->type != VIR_DOMAIN_GRAPHICS_TYPE_VNC) {
+        def->type != VIR_DOMAIN_GRAPHICS_TYPE_VNC &&
+        def->type != VIR_DOMAIN_GRAPHICS_TYPE_SPICE) {
         virReportError(VIR_ERR_XML_ERROR,
                        _("socket is not available for graphics type='%s'"),
                        virDomainGraphicsTypeToString(def->type));

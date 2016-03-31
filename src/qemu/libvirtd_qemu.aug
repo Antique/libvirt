@@ -40,6 +40,7 @@ module Libvirtd_qemu =
                  | str_entry "spice_password"
                  | bool_entry "spice_sasl"
                  | str_entry "spice_sasl_dir"
+                 | bool_entry "spice_auto_unix_socket"
 
    let nogfx_entry = bool_entry "nographics_allow_host_audio"
 

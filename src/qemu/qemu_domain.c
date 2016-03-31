@@ -1438,6 +1438,10 @@ qemuDomainDefPostParse(virDomainDefPtr def,
             if (cfg->vncAutoUnixSocket)
                 virDomainGraphicsListenClear(graphics);
         }
+        if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_SPICE) {
+            if (cfg->spiceAutoUnixSocket)
+                virDomainGraphicsListenClear(graphics);
+        }
     }
 
     if (!(qemuCaps = virQEMUCapsCacheLookup(driver->qemuCapsCache,

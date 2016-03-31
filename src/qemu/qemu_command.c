@@ -7381,32 +7381,29 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
         goto error;
     }
 
-    if (port > 0)
-        virBufferAsprintf(&opt, "port=%u,", port);
+    if (!(listen = virDomainGraphicsGetListen(graphics, 0))) {
+        virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                       _("missing listen element for graphics device"));
+        goto error;
+    }
 
-    if (tlsPort > 0) {
-        if (!cfg->spiceTLS) {
-            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                           _("spice TLS port set in XML configuration,"
-                             " but TLS is disabled in qemu.conf"));
-            goto error;
+    if (listen->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET) {
+        virBufferAsprintf(&opt, "unix,addr=%s,", listen->socket);
+    } else {
+        if (port > 0)
+            virBufferAsprintf(&opt, "port=%u,", port);
+
+        if (tlsPort > 0) {
+            if (!cfg->spiceTLS) {
+                virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                               _("spice TLS port set in XML configuration,"
+                                 " but TLS is disabled in qemu.conf"));
+                goto error;
+            }
+            virBufferAsprintf(&opt, "tls-port=%u,", tlsPort);
         }
-        virBufferAsprintf(&opt, "tls-port=%u,", tlsPort);
-    }
 
-    if (cfg->spiceSASL) {
-        virBufferAddLit(&opt, "sasl,");
-
-        if (cfg->spiceSASLdir)
-            virCommandAddEnvPair(cmd, "SASL_CONF_PATH",
-                                 cfg->spiceSASLdir);
-
-        /* TODO: Support ACLs later */
-    }
-
-    if (port > 0 || tlsPort > 0) {
-        if ((listen = virDomainGraphicsGetListen(graphics, 0))) {
-
+        if (port > 0 || tlsPort > 0) {
             switch (listen->type) {
             case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS:
                 listenAddr = listen->address;
@@ -7433,14 +7430,24 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
                     goto error;
                 break;
             }
+
+            if (!listenAddr)
+                listenAddr = cfg->spiceListen;
+            if (listenAddr)
+                virBufferAsprintf(&opt, "addr=%s,", listenAddr);
+
+            VIR_FREE(netAddr);
         }
+    }
 
-        if (!listenAddr)
-            listenAddr = cfg->spiceListen;
-        if (listenAddr)
-            virBufferAsprintf(&opt, "addr=%s,", listenAddr);
+    if (cfg->spiceSASL) {
+        virBufferAddLit(&opt, "sasl,");
 
-        VIR_FREE(netAddr);
+        if (cfg->spiceSASLdir)
+            virCommandAddEnvPair(cmd, "SASL_CONF_PATH",
+                                 cfg->spiceSASLdir);
+
+        /* TODO: Support ACLs later */
     }
 
     if (graphics->data.spice.mousemode) {
