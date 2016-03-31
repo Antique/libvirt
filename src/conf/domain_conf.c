@@ -1228,10 +1228,20 @@ virDomainGraphicsListenDefClear(virDomainGraphicsListenDefPtr def)
 }
 
 
-void virDomainGraphicsDefFree(virDomainGraphicsDefPtr def)
+void
+virDomainGraphicsListenClear(virDomainGraphicsDefPtr def)
 {
     size_t i;
 
+    for (i = 0; i < def->nListens; i++)
+        virDomainGraphicsListenDefClear(&def->listens[i]);
+    VIR_FREE(def->listens);
+    def->nListens = 0;
+}
+
+
+void virDomainGraphicsDefFree(virDomainGraphicsDefPtr def)
+{
     if (!def)
         return;
 
@@ -1263,9 +1273,7 @@ void virDomainGraphicsDefFree(virDomainGraphicsDefPtr def)
         break;
     }
 
-    for (i = 0; i < def->nListens; i++)
-        virDomainGraphicsListenDefClear(&def->listens[i]);
-    VIR_FREE(def->listens);
+    virDomainGraphicsListenClear(def);
 
     VIR_FREE(def);
 }

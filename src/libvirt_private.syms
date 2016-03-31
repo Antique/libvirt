@@ -303,6 +303,7 @@ virDomainGraphicsDefFree;
 virDomainGraphicsGetListen;
 virDomainGraphicsListenAddAddress;
 virDomainGraphicsListenAddNetwork;
+virDomainGraphicsListenClear;
 virDomainGraphicsSpiceChannelModeTypeFromString;
 virDomainGraphicsSpiceChannelModeTypeToString;
 virDomainGraphicsSpiceChannelNameTypeFromString;

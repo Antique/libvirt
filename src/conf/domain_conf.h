@@ -2813,6 +2813,7 @@ int virDomainHostdevFind(virDomainDefPtr def, virDomainHostdevDefPtr match,
 
 virDomainGraphicsListenDefPtr
 virDomainGraphicsGetListen(virDomainGraphicsDefPtr def, size_t i);
+void virDomainGraphicsListenClear(virDomainGraphicsDefPtr def);
 int virDomainGraphicsListenAddAddress(virDomainGraphicsDefPtr def,
                                       int pos,
                                       const char *address)
