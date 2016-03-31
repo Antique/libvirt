@@ -2673,6 +2673,16 @@ qemuDomainChangeGraphics(virQEMUDriverPtr driver,
             }
             break;
 
+        case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET:
+            if (STRNEQ_NULLABLE(newlisten->socket, oldlisten->socket)) {
+                virReportError(VIR_ERR_OPERATION_UNSUPPORTED, "%s",
+                               dev->type == VIR_DOMAIN_GRAPHICS_TYPE_VNC ?
+                           _("cannot change listen network setting on vnc graphics") :
+                           _("cannot change listen network setting on spice graphics"));
+                goto cleanup;
+            }
+            break;
+
         case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NONE:
         case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_LAST:
             /* nada */

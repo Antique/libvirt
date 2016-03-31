@@ -1520,6 +1520,7 @@ typedef enum {
     VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NONE = 0,
     VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS,
     VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NETWORK,
+    VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET,
 
     VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_LAST
 } virDomainGraphicsListenType;
@@ -1536,6 +1537,7 @@ struct _virDomainGraphicsListenDef {
     int type;   /* enum virDomainGraphicsListenType */
     char *address;
     char *network;
+    char *socket;
     bool fromConfig;    /* true if the @address is config file originated */
 };
 
@@ -2821,6 +2823,10 @@ int virDomainGraphicsListenAddAddress(virDomainGraphicsDefPtr def,
 int virDomainGraphicsListenAddNetwork(virDomainGraphicsDefPtr def,
                                       int pos,
                                       const char *network)
+            ATTRIBUTE_NONNULL(1);
+int virDomainGraphicsListenAddSocket(virDomainGraphicsDefPtr def,
+                                     int pos,
+                                     const char *socket)
             ATTRIBUTE_NONNULL(1);
 
 int virDomainNetGetActualType(virDomainNetDefPtr iface);

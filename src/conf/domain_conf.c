@@ -556,7 +556,8 @@ VIR_ENUM_IMPL(virDomainGraphics, VIR_DOMAIN_GRAPHICS_TYPE_LAST,
 VIR_ENUM_IMPL(virDomainGraphicsListen, VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_LAST,
               "none",
               "address",
-              "network")
+              "network",
+              "socket")
 
 VIR_ENUM_IMPL(virDomainGraphicsAuthConnected,
               VIR_DOMAIN_GRAPHICS_AUTH_CONNECTED_LAST,
@@ -1224,6 +1225,7 @@ virDomainGraphicsListenDefClear(virDomainGraphicsListenDefPtr def)
 
     VIR_FREE(def->address);
     VIR_FREE(def->network);
+    VIR_FREE(def->socket);
     return;
 }
 
@@ -10619,9 +10621,10 @@ virDomainGraphicsListenDefParseXML(virDomainGraphicsDefPtr def,
                                    unsigned int flags)
 {
     int ret = -1;
-    char *type     = virXMLPropString(node, "type");
-    char *address  = virXMLPropString(node, "address");
-    char *network  = virXMLPropString(node, "network");
+    char *type = virXMLPropString(node, "type");
+    char *address = virXMLPropString(node, "address");
+    char *network = virXMLPropString(node, "network");
+    char *socket = virXMLPropString(node, "socket");
     char *fromConfig = virXMLPropString(node, "fromConfig");
     int tmp;
     virDomainGraphicsListenDef listen;
@@ -10661,6 +10664,17 @@ virDomainGraphicsListenDefParseXML(virDomainGraphicsDefPtr def,
         }
         listen.network = network;
         network = NULL;
+    }
+
+    if (socket && socket[0]) {
+        if (listen.type != VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET) {
+            virReportError(VIR_ERR_XML_ERROR, "%s",
+                           _("socket attribute not allowed when listen type is "
+                             "not socket"));
+            goto error;
+        }
+        listen.socket = socket;
+        socket = NULL;
     }
 
     if (fromConfig &&
@@ -21320,6 +21334,11 @@ virDomainGraphicsListenDefFormat(virBufferPtr buf,
         virBufferEscapeString(buf, " network='%s'", def->network);
     }
 
+    if (def->socket &&
+        (def->type == VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET)) {
+        virBufferEscapeString(buf, " socket='%s'", def->socket);
+    }
+
     if (flags & VIR_DOMAIN_DEF_FORMAT_STATUS)
         virBufferAsprintf(buf, " fromConfig='%d'", def->fromConfig);
 
@@ -23809,6 +23828,31 @@ virDomainGraphicsListenAddNetwork(virDomainGraphicsDefPtr def,
     return 0;
  error:
     VIR_FREE(listen.network);
+    return -1;
+}
+
+
+int
+virDomainGraphicsListenAddSocket(virDomainGraphicsDefPtr def,
+                                 int pos,
+                                 const char *socket)
+{
+    virDomainGraphicsListenDef listen;
+
+    memset(&listen, 0, sizeof(listen));
+
+    listen.type = VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET;
+
+    if (VIR_STRDUP(listen.socket, socket) < 0)
+        goto error;
+
+    if (VIR_INSERT_ELEMENT_COPY(def->listens, pos, def->nListens, listen) < 0)
+        goto error;
+
+    return 0;
+
+ error:
+    VIR_FREE(listen.socket);
     return -1;
 }
 
