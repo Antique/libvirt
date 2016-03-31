@@ -1439,8 +1439,15 @@ qemuDomainDefPostParse(virDomainDefPtr def,
                 virDomainGraphicsListenClear(graphics);
         }
         if (graphics->type == VIR_DOMAIN_GRAPHICS_TYPE_SPICE) {
-            if (cfg->spiceAutoUnixSocket)
+            if (cfg->spiceAutoUnixSocket) {
                 virDomainGraphicsListenClear(graphics);
+                continue;
+            }
+
+            if (graphics->data.spice.gl == VIR_TRISTATE_SWITCH_ON &&
+                graphics->nListens == 0 &&
+                virDomainGraphicsListenAddFd(graphics, 0) < 0)
+                    goto cleanup;
         }
     }
 

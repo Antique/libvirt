@@ -7369,6 +7369,28 @@ qemuBuildGraphicsVNCCommandLine(virQEMUDriverConfigPtr cfg,
 
 
 static int
+qemuBuildGraphicsSpiceGlOpt(virDomainGraphicsDefPtr graphics,
+                            virQEMUCapsPtr qemuCaps,
+                            virBufferPtr opt)
+{
+    if (graphics->data.spice.gl == VIR_TRISTATE_SWITCH_ON) {
+        if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_SPICE_GL)) {
+            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
+                           _("This QEMU doesn't support spice OpenGL"));
+            return -1;
+        }
+
+        /* spice.gl is a TristateBool, but qemu expects on/off: use
+         * TristateSwitch helper */
+        virBufferAsprintf(opt, "gl=%s,",
+                          virTristateSwitchTypeToString(graphics->data.spice.gl));
+    }
+
+    return 0;
+}
+
+
+static int
 qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
                                   virCommandPtr cmd,
                                   virQEMUCapsPtr qemuCaps,
@@ -7399,6 +7421,13 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
     switch (listen->type) {
     case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_SOCKET:
         virBufferAsprintf(&opt, "unix,addr=%s,", listen->socket);
+        if (qemuBuildGraphicsSpiceGlOpt(graphics, qemuCaps, &opt) < 0)
+            goto error;
+        break;
+
+    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_FD:
+        if (qemuBuildGraphicsSpiceGlOpt(graphics, qemuCaps, &opt) < 0)
+            goto error;
         break;
 
     case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_ADDRESS:
@@ -7454,7 +7483,6 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
         break;
 
     case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_NONE:
-    case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_FD:
     case VIR_DOMAIN_GRAPHICS_LISTEN_TYPE_LAST:
         break;
     }
@@ -7581,19 +7609,6 @@ qemuBuildGraphicsSPICECommandLine(virQEMUDriverConfigPtr cfg,
         } else {
             virBufferAddLit(&opt, "disable-agent-file-xfer,");
         }
-    }
-
-    if (graphics->data.spice.gl == VIR_TRISTATE_SWITCH_ON) {
-        if (!virQEMUCapsGet(qemuCaps, QEMU_CAPS_SPICE_GL)) {
-            virReportError(VIR_ERR_CONFIG_UNSUPPORTED, "%s",
-                           _("This QEMU doesn't support spice OpenGL"));
-            goto error;
-        }
-
-        /* spice.gl is a TristateBool, but qemu expects on/off: use
-         * TristateSwitch helper */
-        virBufferAsprintf(&opt, "gl=%s,",
-                          virTristateSwitchTypeToString(graphics->data.spice.gl));
     }
 
     if (virQEMUCapsGet(qemuCaps, QEMU_CAPS_SEAMLESS_MIGRATION)) {
