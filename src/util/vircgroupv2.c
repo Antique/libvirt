@@ -1828,6 +1828,50 @@ virCgroupV2AllowDevice(virCgroupPtr group,
 }
 
 
+static int
+virCgroupV2DenyDevice(virCgroupPtr group,
+                      char type,
+                      int major,
+                      int minor,
+                      int perms)
+{
+    __u64 key = (__u64)major << 32 | ((__u64)minor & 0x00000000ffffffff);
+    __u32 newval = virCgroupV2DeviceGetPerms(perms, type);
+    __u32 val = 0;
+    int rc;
+
+    VIR_DEBUG("deny device %c %x:%x perms:%x key:%llx val:%x", type, major, minor, perms, key, val);
+
+    rc = virCgroupV2DetectDeviceBPF(group);
+    if (rc < 0)
+        return -1;
+    if (rc == 0 && virCgroupV2LoadDeviceBPF(group) < 0)
+        return -1;
+
+    if (virBPFLookupElem(group->unified.mapfd, &key, &val) < 0) {
+        VIR_DEBUG("nothing to do, device is not allowed");
+        return 0;
+    }
+
+    if (newval == val) {
+        if (virBPFDeleteElem(group->unified.mapfd, &key) < 0) {
+            virReportSystemError(errno, "%s",
+                                 _("failed to remove device from BPF cgroup map"));
+            return -1;
+        }
+    } else {
+        val ^= val & newval;
+        if (virBPFUpdateElem(group->unified.mapfd, &key, &val) < 0) {
+            virReportSystemError(errno, "%s",
+                                 _("failed to update device in BPF cgroup map"));
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+
 virCgroupBackend virCgroupV2Backend = {
     .type = VIR_CGROUP_BACKEND_TYPE_V2,
 
@@ -1877,6 +1921,7 @@ virCgroupBackend virCgroupV2Backend = {
     .getMemSwapUsage = virCgroupV2GetMemSwapUsage,
 
     .allowDevice = virCgroupV2AllowDevice,
+    .denyDevice = virCgroupV2DenyDevice,
 
     .setCpuShares = virCgroupV2SetCpuShares,
     .getCpuShares = virCgroupV2GetCpuShares,
