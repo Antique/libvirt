@@ -1799,6 +1799,35 @@ virCgroupV2DeviceGetPerms(int perms,
 }
 
 
+static int
+virCgroupV2AllowDevice(virCgroupPtr group,
+                       char type,
+                       int major,
+                       int minor,
+                       int perms)
+{
+    __u64 key = (__u64)major << 32 | ((__u64)minor & 0x00000000ffffffff);
+    __u32 val = virCgroupV2DeviceGetPerms(perms, type);
+    int rc;
+
+    VIR_DEBUG("allow device %c %x:%x perms:%x key:%llx val:%x", type, major, minor, perms, key, val);
+
+    rc = virCgroupV2DetectDeviceBPF(group);
+    if (rc < 0)
+        return -1;
+    if (rc == 0 && virCgroupV2LoadDeviceBPF(group) < 0)
+        return -1;
+
+    if (virBPFUpdateElem(group->unified.mapfd, &key, &val) < 0) {
+        virReportSystemError(errno, "%s",
+                             _("failed to update device in BPF cgroup map"));
+        return -1;
+    }
+
+    return 0;
+}
+
+
 virCgroupBackend virCgroupV2Backend = {
     .type = VIR_CGROUP_BACKEND_TYPE_V2,
 
@@ -1846,6 +1875,8 @@ virCgroupBackend virCgroupV2Backend = {
     .setMemSwapHardLimit = virCgroupV2SetMemSwapHardLimit,
     .getMemSwapHardLimit = virCgroupV2GetMemSwapHardLimit,
     .getMemSwapUsage = virCgroupV2GetMemSwapUsage,
+
+    .allowDevice = virCgroupV2AllowDevice,
 
     .setCpuShares = virCgroupV2SetCpuShares,
     .getCpuShares = virCgroupV2GetCpuShares,
