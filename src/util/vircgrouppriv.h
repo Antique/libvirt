@@ -49,6 +49,8 @@ struct _virCgroupV2Controller {
     int controllers;
     char *mountPoint;
     char *placement;
+    int mapfd;
+    int progfd;
 };
 typedef struct _virCgroupV2Controller virCgroupV2Controller;
 typedef virCgroupV2Controller *virCgroupV2ControllerPtr;

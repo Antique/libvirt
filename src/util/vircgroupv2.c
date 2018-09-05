@@ -1645,6 +1645,61 @@ virCgroupV2LoadDeviceProg(int mapfd)
 }
 
 
+static int
+virCgroupV2LoadDeviceBPF(virCgroupPtr group)
+{
+    int ret = -1;
+    int mapfd = -1;
+    int progfd = -1;
+    int cgroupfd = -1;
+    VIR_AUTOFREE(char *) path = NULL;
+
+    if (group->unified.progfd > 0 && group->unified.mapfd > 0)
+        return 0;
+
+    if (virCgroupV2PathOfController(group, VIR_CGROUP_CONTROLLER_DEVICES,
+                                    NULL, &path) < 0) {
+        goto cleanup;
+    }
+
+    mapfd = virBPFCreateMap(BPF_MAP_TYPE_HASH, sizeof(__u64),
+                            sizeof(__u32), 1024);
+    if (mapfd < 0) {
+        virReportSystemError(errno, "%s", _("failed to initialize BPF map"));
+        goto cleanup;
+    }
+
+    progfd = virCgroupV2LoadDeviceProg(mapfd);
+    if (progfd < 0) {
+        virReportSystemError(errno, "%s", _("failed to load cgroup BPF prog"));
+        goto cleanup;
+    }
+
+    cgroupfd = open(path, O_RDONLY);
+    if (cgroupfd < 0) {
+        virReportSystemError(errno, _("unable to open '%s'"), path);
+        goto cleanup;
+    }
+
+    if (virBPFAttachProg(progfd, cgroupfd, BPF_CGROUP_DEVICE) < 0) {
+        virReportSystemError(errno, "%s", _("failed to attach cgroup BPF prog"));
+        goto cleanup;
+    }
+
+    group->unified.progfd = progfd;
+    group->unified.mapfd = mapfd;
+    progfd = -1;
+    mapfd = -1;
+
+    ret = 0;
+ cleanup:
+    VIR_FORCE_CLOSE(cgroupfd);
+    VIR_FORCE_CLOSE(progfd);
+    VIR_FORCE_CLOSE(mapfd);
+    return ret;
+}
+
+
 virCgroupBackend virCgroupV2Backend = {
     .type = VIR_CGROUP_BACKEND_TYPE_V2,
 
