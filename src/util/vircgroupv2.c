@@ -1700,6 +1700,79 @@ virCgroupV2LoadDeviceBPF(virCgroupPtr group)
 }
 
 
+# define MAX_PROG_IDS 10
+
+static int
+virCgroupV2DetectDeviceBPF(virCgroupPtr group)
+{
+    int ret = -1;
+    int cgroupfd = -1;
+    unsigned int progcnt = 0;
+    unsigned int progids[MAX_PROG_IDS] = { 0 };
+    VIR_AUTOFREE(char *) path = NULL;
+
+    if (group->unified.progfd > 0 && group->unified.mapfd > 0)
+        return 0;
+
+    if (virCgroupV2PathOfController(group, VIR_CGROUP_CONTROLLER_DEVICES,
+                                    NULL, &path) < 0) {
+        return -1;
+    }
+
+    cgroupfd = open(path, O_RDONLY);
+    if (cgroupfd < 0) {
+        virReportSystemError(errno, _("unable to open '%s'"), path);
+        goto cleanup;
+    }
+
+    if (virBPFQueryProg(cgroupfd, MAX_PROG_IDS, BPF_CGROUP_DEVICE,
+                        &progcnt, progids) < 0) {
+        virReportSystemError(errno, "%s", _("unable to query cgroup BPF progs"));
+        goto cleanup;
+    }
+
+    if (progcnt > 0) {
+        int progfd = virBPFGetProg(progids[0]);
+        int mapfd = -1;
+        struct bpf_prog_info info = { 0 };
+        VIR_AUTOFREE(unsigned int *) mapIDs = NULL;
+
+        if (progfd < 0) {
+            virReportSystemError(errno, "%s", _("failed to get cgroup BPF prog FD"));
+            goto cleanup;
+        }
+
+        if (virBPFGetProgInfo(progfd, &info, &mapIDs) < 0) {
+            virReportSystemError(errno, "%s", _("failed to get cgroup BPF prog info"));
+            goto cleanup;
+        }
+
+        if (info.nr_map_ids == 0) {
+            virReportError(VIR_ERR_INTERNAL_ERROR, "%s",
+                           _("no map for cgroup BPF prog"));
+            goto cleanup;
+        }
+
+        mapfd = virBPFGetMap(mapIDs[0]);
+        if (mapfd < 0) {
+            virReportSystemError(errno, "%s", _("failed to get cgroup BPF map FD"));
+            goto cleanup;
+        }
+
+        group->unified.progfd = progfd;
+        group->unified.mapfd = mapfd;
+
+        ret = 1;
+        goto cleanup;
+    }
+
+    ret = 0;
+ cleanup:
+    VIR_FORCE_CLOSE(cgroupfd);
+    return ret;
+}
+
+
 virCgroupBackend virCgroupV2Backend = {
     .type = VIR_CGROUP_BACKEND_TYPE_V2,
 
