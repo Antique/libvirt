@@ -1897,6 +1897,30 @@ virCgroupV2AllowAllDevices(virCgroupPtr group,
 }
 
 
+static int
+virCgroupV2DenyAllDevices(virCgroupPtr group)
+{
+    __u64 key = 0;
+    int rc;
+
+    rc = virCgroupV2DetectDeviceBPF(group);
+    if (rc < 0)
+        return -1;
+    if (rc == 0 && virCgroupV2LoadDeviceBPF(group) < 0)
+        return -1;
+
+    while (virBPFGetNextElem(group->unified.mapfd, &key) == 0) {
+        if (virBPFDeleteElem(group->unified.mapfd, &key) < 0) {
+            virReportSystemError(errno, "%s",
+                                 _("failed to remove device from BPF cgroup map"));
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+
 virCgroupBackend virCgroupV2Backend = {
     .type = VIR_CGROUP_BACKEND_TYPE_V2,
 
@@ -1948,6 +1972,7 @@ virCgroupBackend virCgroupV2Backend = {
     .allowDevice = virCgroupV2AllowDevice,
     .denyDevice = virCgroupV2DenyDevice,
     .allowAllDevices = virCgroupV2AllowAllDevices,
+    .denyAllDevices = virCgroupV2DenyAllDevices,
 
     .setCpuShares = virCgroupV2SetCpuShares,
     .getCpuShares = virCgroupV2GetCpuShares,
