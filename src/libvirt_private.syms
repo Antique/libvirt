@@ -1468,6 +1468,20 @@ virBitmapToDataBuf;
 virBitmapToString;
 
 
+# util/virbpf.h
+virBPFAttachProg;
+virBPFCreateMap;
+virBPFDeleteElem;
+virBPFGetMap;
+virBPFGetNextElem;
+virBPFGetProg;
+virBPFGetProgInfo;
+virBPFLoadProg;
+virBPFLookupElem;
+virBPFQueryProg;
+virBPFUpdateElem;
+
+
 # util/virbuffer.h
 virBufferAdd;
 virBufferAddBuffer;
